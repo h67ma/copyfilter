@@ -342,7 +342,7 @@ Routine Description:
         if (hookMouse->IsrRoutine) {
             devExt->UpperIsrHook = hookMouse->IsrRoutine;
         }
-        hookMouse->IsrRoutine = (PI8042_MOUSE_ISR) MouFilter_IsrHook;
+        //hookMouse->IsrRoutine = (PI8042_MOUSE_ISR) MouFilter_IsrHook;
 
         //
         // Store all of the other functions we might need in the future
@@ -373,19 +373,7 @@ Routine Description:
 }
 
 
-BOOLEAN
-MouFilter_IsrHook (
-    PVOID         DeviceExtension, 
-    PMOUSE_INPUT_DATA       CurrentInput, 
-    POUTPUT_PACKET          CurrentOutput,
-    UCHAR                   StatusByte,
-    PUCHAR                  DataByte,
-    PBOOLEAN                ContinueProcessing,
-    PMOUSE_STATE            MouseState,
-    PMOUSE_RESET_SUBSTATE   ResetSubState
-)
-/*++
-
+/*
 Remarks:
     i8042prt specific code, if you are writing a packet only filter driver, you
     can remove this function
@@ -419,6 +407,17 @@ Return Value:
     Status is returned.
 
   --+*/
+/*BOOLEAN
+MouFilter_IsrHook(
+	PVOID         DeviceExtension,
+	PMOUSE_INPUT_DATA       CurrentInput,
+	POUTPUT_PACKET          CurrentOutput,
+	UCHAR                   StatusByte,
+	PUCHAR                  DataByte,
+	PBOOLEAN                ContinueProcessing,
+	PMOUSE_STATE            MouseState,
+	PMOUSE_RESET_SUBSTATE   ResetSubState
+)
 {
     PDEVICE_EXTENSION   devExt;
     BOOLEAN             retVal = TRUE;
@@ -442,48 +441,59 @@ Return Value:
     }
 
     *ContinueProcessing = TRUE;
+
     return retVal;
-}
+}*/
 
-    
+/*VOID CopyCallback(PIO_WORKITEM workItem)
+{
+	PAGED_CODE();
+	DebugPrint(("moutiltr: msg from queue!"));
+	//IoUninitializeWorkItem(stuff->item); // necessary if IoInitializeWorkItem() was used
+	//IoFreeWorkItem(workItem);
+	//ExFreePool(workItem);
+}*/
 
-VOID
-MouFilter_ServiceCallback(
-    IN PDEVICE_OBJECT DeviceObject,
-    IN PMOUSE_INPUT_DATA InputDataStart,
-    IN PMOUSE_INPUT_DATA InputDataEnd,
-    IN OUT PULONG InputDataConsumed
-    )
-/*++
-
+/*
 Routine Description:
-
     Called when there are mouse packets to report to the RIT.  You can do 
     anything you like to the packets.  For instance:
-    
-    o Drop a packet altogether
-    o Mutate the contents of a packet 
-    o Insert packets into the stream 
-                    
+    - Drop a packet altogether
+    - Mutate the contents of a packet
+    - Insert packets into the stream
 Arguments:
-
     DeviceObject - Context passed during the connect IOCTL
-    
     InputDataStart - First packet to be reported
-    
     InputDataEnd - One past the last packet to be reported.  Total number of
                    packets is equal to InputDataEnd - InputDataStart
-    
     InputDataConsumed - Set to the total number of packets consumed by the RIT
-                        (via the function pointer we replaced in the connect
-                        IOCTL)
-
+                        (via the function pointer we replaced in the connect IOCTL)
 Return Value:
-
-    Status is returned.
-
---*/
+	Status is returned.
+*/
+VOID
+MouFilter_ServiceCallback(
+	IN PDEVICE_OBJECT DeviceObject,
+	IN PMOUSE_INPUT_DATA InputDataStart,
+	IN PMOUSE_INPUT_DATA InputDataEnd,
+	IN OUT PULONG InputDataConsumed
+)
 {
+	//DebugPrint(("MouFilter_ServiceCallback start: %d end: %d", InputDataStart->Buttons, InputDataEnd->Buttons));
+	DebugPrint(("moutiltr: MouFilter_ServiceCallback!"));
+	/*if (InputDataStart->Buttons == 32)
+	{
+		// middle button
+		DebugPrint(("moutiltr: detected middle button!"));
+		PIO_WORKITEM workItem = IoAllocateWorkItem(DeviceObject);
+		//IoInitializeWorkItem(DeviceObject, stuff->item); // IoAllocateWorkItem() fills the structure
+		IoQueueWorkItem(workItem, (PIO_WORKITEM_ROUTINE)CopyCallback, DelayedWorkQueue, workItem);
+
+		//PRANDOM_JUNK stuff = (PRANDOM_JUNK)ExAllocatePool(NonPagedPool, sizeof(RANDOM_JUNK));
+		//stuff->item = IoAllocateWorkItem(DeviceObject);
+		//IoQueueWorkItem(stuff->item, (PIO_WORKITEM_ROUTINE)CopyCallback, DelayedWorkQueue, stuff);
+	}*/
+
     PDEVICE_EXTENSION   devExt;
     WDFDEVICE   hDevice;
 
@@ -499,6 +509,6 @@ Return Value:
         InputDataEnd,
         InputDataConsumed
         );
-} 
+}
 
 #pragma warning(pop)
