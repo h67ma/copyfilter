@@ -299,7 +299,6 @@ Routine Description:
         //
         connectData->ClassDeviceObject = WdfDeviceWdmGetDeviceObject(hDevice);
         connectData->ClassService = MouFilter_ServiceCallback;
-
         break;
 
     //
@@ -321,9 +320,8 @@ Routine Description:
     // i8042 (ie PS/2) mouse.  This is only necessary if you want to do PS/2
     // specific functions, otherwise hooking the CONNECT_DATA is sufficient
     //
-    case IOCTL_INTERNAL_I8042_HOOK_MOUSE:   
-
-          DebugPrint(("hook mouse received!\n"));
+    case IOCTL_INTERNAL_I8042_HOOK_MOUSE:
+		DebugPrint(("hook mouse received!\n"));
         
         // Get the input buffer from the request
         // (Parameters.DeviceIoControl.Type3InputBuffer)
@@ -414,7 +412,7 @@ VOID CopyCallback(_In_ WDFWORKITEM _WorkItem)
 	else
 		DebugPrint(("moutiltr: CopyCallback: can't open file: %x\n", Status));
 
-	ZWClose(fileHandle);
+	ZwClose(fileHandle);
 
 	WdfObjectDelete(_WorkItem);
 }
