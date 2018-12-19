@@ -383,38 +383,46 @@ Arguments:
 VOID CopyCallback(_In_ WDFWORKITEM _WorkItem)
 {
 	PAGED_CODE();
-
-	UNICODE_STRING fileName;
-	RtlInitUnicodeString(&fileName, L"\\DosDevices\\C:\\Users\\sancho\\Desktop\\src.txt");
-
-	OBJECT_ATTRIBUTES objectAttributes;
-	InitializeObjectAttributes(&objectAttributes,
-		&fileName,
-		(OBJ_CASE_INSENSITIVE | OBJ_KERNEL_HANDLE),
-		NULL,
-		NULL);
-
-	HANDLE fileHandle;
-	IO_STATUS_BLOCK ioStatusBlock;
-	NTSTATUS Status = ZwCreateFile(&fileHandle,
-		GENERIC_READ,
-		&objectAttributes, &ioStatusBlock, NULL,
-		FILE_ATTRIBUTE_NORMAL,
-		0,
-		FILE_OVERWRITE_IF,
-		FILE_SYNCHRONOUS_IO_NONALERT,
-		NULL, 0);
-
-	if (NT_SUCCESS(Status) && NT_SUCCESS(ioStatusBlock.Status))
-	{
-		DebugPrint(("moutiltr: CopyCallback: opened file sakcis!\n"));
-	}
-	else
-		DebugPrint(("moutiltr: CopyCallback: can't open file: %x\n", Status));
-
-	ZwClose(fileHandle);
-
+	CopyFile();
 	WdfObjectDelete(_WorkItem);
+}
+
+VOID CopyFile()
+{
+	UNICODE_STRING srcFileName;
+	RtlInitUnicodeString(&srcFileName, L"\\DosDevices\\C:\\Users\\sancho\\Desktop\\src.txt");
+
+	UNICODE_STRING dstFileName;
+	RtlInitUnicodeString(&dstFileName, L"\\DosDevices\\C:\\Users\\sancho\\Documents\\dst.txt");
+
+	OBJECT_ATTRIBUTES srcObjectAttributes;
+	InitializeObjectAttributes(&srcObjectAttributes, &srcFileName, (OBJ_CASE_INSENSITIVE | OBJ_KERNEL_HANDLE), NULL, NULL);
+
+	OBJECT_ATTRIBUTES dstObjectAttributes;
+	InitializeObjectAttributes(&dstObjectAttributes, &dstFileName, (OBJ_CASE_INSENSITIVE | OBJ_KERNEL_HANDLE), NULL, NULL);
+
+	HANDLE srcFileHandle;
+	IO_STATUS_BLOCK srcIoStatusBlock;
+	NTSTATUS srcStatus = ZwCreateFile(&srcFileHandle, GENERIC_READ, &srcObjectAttributes, &srcIoStatusBlock, NULL,
+		FILE_ATTRIBUTE_NORMAL, 0, FILE_OVERWRITE_IF, FILE_SYNCHRONOUS_IO_NONALERT, NULL, 0);
+
+	HANDLE dstFileHandle;
+	IO_STATUS_BLOCK dstIoStatusBlock;
+	NTSTATUS dstStatus = ZwCreateFile(&dstFileHandle, GENERIC_WRITE, &dstObjectAttributes, &dstIoStatusBlock, NULL,
+		FILE_ATTRIBUTE_NORMAL, 0, FILE_OVERWRITE_IF, FILE_SYNCHRONOUS_IO_NONALERT, NULL, 0);
+
+	if (!NT_SUCCESS(srcStatus) || !NT_SUCCESS(dstStatus))
+	{
+		DebugPrint(("moutiltr: CopyCallback: can't open file: srcStatus=%x dstStatus=%x\n", srcStatus, dstStatus));
+		return;
+	}
+
+	// files ok
+
+
+
+	ZwClose(srcFileHandle);
+	ZwClose(dstFileHandle);
 }
 
 /*
