@@ -30,6 +30,8 @@ Notes:
 
 WDF_DECLARE_CONTEXT_TYPE_WITH_NAME(COPY_CONTEXT, GetEnablePdoWorkItemContext)
 
+int _pressCounter = 0;
+
 NTSTATUS
 DriverEntry (
     IN  PDRIVER_OBJECT  DriverObject,
@@ -383,7 +385,37 @@ Arguments:
 VOID CopyCallback(_In_ WDFWORKITEM _WorkItem)
 {
 	PAGED_CODE();
-	DebugPrint(("moutiltr: CopyCallback!\n"));
+
+	UNICODE_STRING fileName;
+	RtlInitUnicodeString(&fileName, L"\\DosDevices\\C:\\Users\\sancho\\Desktop\\src.txt");
+
+	OBJECT_ATTRIBUTES objectAttributes;
+	InitializeObjectAttributes(&objectAttributes,
+		&fileName,
+		(OBJ_CASE_INSENSITIVE | OBJ_KERNEL_HANDLE),
+		NULL,
+		NULL);
+
+	HANDLE fileHandle;
+	IO_STATUS_BLOCK ioStatusBlock;
+	NTSTATUS Status = ZwCreateFile(&fileHandle,
+		GENERIC_READ,
+		&objectAttributes, &ioStatusBlock, NULL,
+		FILE_ATTRIBUTE_NORMAL,
+		0,
+		FILE_OVERWRITE_IF,
+		FILE_SYNCHRONOUS_IO_NONALERT,
+		NULL, 0);
+
+	if (NT_SUCCESS(Status) && NT_SUCCESS(ioStatusBlock.Status))
+	{
+		DebugPrint(("moutiltr: CopyCallback: opened file sakcis!\n"));
+	}
+	else
+		DebugPrint(("moutiltr: CopyCallback: can't open file: %x\n", Status));
+
+	ZWClose(fileHandle);
+
 	WdfObjectDelete(_WorkItem);
 }
 
@@ -414,26 +446,35 @@ MouFilter_ServiceCallback(
 {
 	WDFDEVICE hDevice = WdfWdmDeviceGetWdfDeviceHandle(DeviceObject);
 
+	// middle button = 2 calls (16, then 32)
 	if (InputDataStart->Buttons == 32)
 	{
-		// middle button
+		// middle button pressed
 
-		WDF_WORKITEM_CONFIG WorkitemConfig;
-		WDF_WORKITEM_CONFIG_INIT(&WorkitemConfig, CopyCallback);
-
-		WDF_OBJECT_ATTRIBUTES ObjAttributes;
-		WDF_OBJECT_ATTRIBUTES_INIT(&ObjAttributes);
-		WDF_OBJECT_ATTRIBUTES_SET_CONTEXT_TYPE(&ObjAttributes, COPY_CONTEXT);
-		ObjAttributes.ParentObject = hDevice;
-
-		WDFWORKITEM WorkItem;
-
-		NTSTATUS Status = WdfWorkItemCreate(&WorkitemConfig, &ObjAttributes, &WorkItem);
-		if (NT_SUCCESS(Status))
+		if (_pressCounter >= 2)
 		{
-			WdfWorkItemEnqueue(WorkItem);
+			WDF_WORKITEM_CONFIG WorkitemConfig;
+			WDF_WORKITEM_CONFIG_INIT(&WorkitemConfig, CopyCallback);
+
+			WDF_OBJECT_ATTRIBUTES ObjAttributes;
+			WDF_OBJECT_ATTRIBUTES_INIT(&ObjAttributes);
+			WDF_OBJECT_ATTRIBUTES_SET_CONTEXT_TYPE(&ObjAttributes, COPY_CONTEXT);
+			ObjAttributes.ParentObject = hDevice;
+
+			WDFWORKITEM WorkItem;
+
+			NTSTATUS Status = WdfWorkItemCreate(&WorkitemConfig, &ObjAttributes, &WorkItem);
+			if (NT_SUCCESS(Status))
+			{
+				WdfWorkItemEnqueue(WorkItem);
+			}
+			_pressCounter = 0;
 		}
+		else
+			_pressCounter++;
 	}
+	else if(InputDataStart->Buttons != 16)
+		_pressCounter = 0;
 
     PDEVICE_EXTENSION devExt = FilterGetData(hDevice);
 
