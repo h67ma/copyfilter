@@ -121,6 +121,10 @@ MouFilter_ServiceCallback(
     IN OUT PULONG InputDataConsumed
     );
 
+typedef struct _COPY_CONTEXT {
+	WDFDEVICE     device;
+} COPY_CONTEXT, *PCOPY_CONTEXT;
+
 #endif  // MOUFILTER_H
 
 

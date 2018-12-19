@@ -28,6 +28,8 @@ Notes:
 #pragma warning(disable:4055) // type case from PVOID to PSERVICE_CALLBACK_ROUTINE
 #pragma warning(disable:4152) // function/data pointer conversion in expression
 
+WDF_DECLARE_CONTEXT_TYPE_WITH_NAME(COPY_CONTEXT, GetEnablePdoWorkItemContext)
+
 NTSTATUS
 DriverEntry (
     IN  PDRIVER_OBJECT  DriverObject,
@@ -372,87 +374,18 @@ Routine Description:
     MouFilter_DispatchPassThrough(Request,WdfDeviceGetIoTarget(hDevice));
 }
 
-
 /*
-Remarks:
-    i8042prt specific code, if you are writing a packet only filter driver, you
-    can remove this function
-
+Routine Description:
+	A work item function to copy files
 Arguments:
-
-    DeviceExtension - Our context passed during IOCTL_INTERNAL_I8042_HOOK_MOUSE
-    
-    CurrentInput - Current input packet being formulated by processing all the
-                    interrupts
-
-    CurrentOutput - Current list of bytes being written to the mouse or the
-                    i8042 port.
-                    
-    StatusByte    - Byte read from I/O port 60 when the interrupt occurred                                            
-    
-    DataByte      - Byte read from I/O port 64 when the interrupt occurred. 
-                    This value can be modified and i8042prt will use this value
-                    if ContinueProcessing is TRUE
-
-    ContinueProcessing - If TRUE, i8042prt will proceed with normal processing of
-                         the interrupt.  If FALSE, i8042prt will return from the
-                         interrupt after this function returns.  Also, if FALSE,
-                         it is this functions responsibilityt to report the input
-                         packet via the function provided in the hook IOCTL or via
-                         queueing a DPC within this driver and calling the
-                         service callback function acquired from the connect IOCTL
-                                             
-Return Value:
-
-    Status is returned.
-
-  --+*/
-/*BOOLEAN
-MouFilter_IsrHook(
-	PVOID         DeviceExtension,
-	PMOUSE_INPUT_DATA       CurrentInput,
-	POUTPUT_PACKET          CurrentOutput,
-	UCHAR                   StatusByte,
-	PUCHAR                  DataByte,
-	PBOOLEAN                ContinueProcessing,
-	PMOUSE_STATE            MouseState,
-	PMOUSE_RESET_SUBSTATE   ResetSubState
-)
-{
-    PDEVICE_EXTENSION   devExt;
-    BOOLEAN             retVal = TRUE;
-
-    devExt = DeviceExtension;
-    
-    if (devExt->UpperIsrHook) {
-        retVal = (*devExt->UpperIsrHook) (devExt->UpperContext,
-                            CurrentInput,
-                            CurrentOutput,
-                            StatusByte,
-                            DataByte,
-                            ContinueProcessing,
-                            MouseState,
-                            ResetSubState
-            );
-
-        if (!retVal || !(*ContinueProcessing)) {
-            return retVal;
-        }
-    }
-
-    *ContinueProcessing = TRUE;
-
-    return retVal;
-}*/
-
-/*VOID CopyCallback(PIO_WORKITEM workItem)
+	_pWorkItem - work item that contains a context to help carrying out its task
+*/
+VOID CopyCallback(_In_ WDFWORKITEM _WorkItem)
 {
 	PAGED_CODE();
-	DebugPrint(("moutiltr: msg from queue!"));
-	//IoUninitializeWorkItem(stuff->item); // necessary if IoInitializeWorkItem() was used
-	//IoFreeWorkItem(workItem);
-	//ExFreePool(workItem);
-}*/
+	DebugPrint(("moutiltr: CopyCallback!\n"));
+	WdfObjectDelete(_WorkItem);
+}
 
 /*
 Routine Description:
@@ -479,30 +412,32 @@ MouFilter_ServiceCallback(
 	IN OUT PULONG InputDataConsumed
 )
 {
-	//DebugPrint(("MouFilter_ServiceCallback start: %d end: %d", InputDataStart->Buttons, InputDataEnd->Buttons));
-	DebugPrint(("moutiltr: MouFilter_ServiceCallback!"));
-	/*if (InputDataStart->Buttons == 32)
+	WDFDEVICE hDevice = WdfWdmDeviceGetWdfDeviceHandle(DeviceObject);
+
+	if (InputDataStart->Buttons == 32)
 	{
 		// middle button
-		DebugPrint(("moutiltr: detected middle button!"));
-		PIO_WORKITEM workItem = IoAllocateWorkItem(DeviceObject);
-		//IoInitializeWorkItem(DeviceObject, stuff->item); // IoAllocateWorkItem() fills the structure
-		IoQueueWorkItem(workItem, (PIO_WORKITEM_ROUTINE)CopyCallback, DelayedWorkQueue, workItem);
 
-		//PRANDOM_JUNK stuff = (PRANDOM_JUNK)ExAllocatePool(NonPagedPool, sizeof(RANDOM_JUNK));
-		//stuff->item = IoAllocateWorkItem(DeviceObject);
-		//IoQueueWorkItem(stuff->item, (PIO_WORKITEM_ROUTINE)CopyCallback, DelayedWorkQueue, stuff);
-	}*/
+		WDF_WORKITEM_CONFIG WorkitemConfig;
+		WDF_WORKITEM_CONFIG_INIT(&WorkitemConfig, CopyCallback);
 
-    PDEVICE_EXTENSION   devExt;
-    WDFDEVICE   hDevice;
+		WDF_OBJECT_ATTRIBUTES ObjAttributes;
+		WDF_OBJECT_ATTRIBUTES_INIT(&ObjAttributes);
+		WDF_OBJECT_ATTRIBUTES_SET_CONTEXT_TYPE(&ObjAttributes, COPY_CONTEXT);
+		ObjAttributes.ParentObject = hDevice;
 
-    hDevice = WdfWdmDeviceGetWdfDeviceHandle(DeviceObject);
+		WDFWORKITEM WorkItem;
 
-    devExt = FilterGetData(hDevice);
-    //
+		NTSTATUS Status = WdfWorkItemCreate(&WorkitemConfig, &ObjAttributes, &WorkItem);
+		if (NT_SUCCESS(Status))
+		{
+			WdfWorkItemEnqueue(WorkItem);
+		}
+	}
+
+    PDEVICE_EXTENSION devExt = FilterGetData(hDevice);
+
     // UpperConnectData must be called at DISPATCH
-    //
     (*(PSERVICE_CALLBACK_ROUTINE) devExt->UpperConnectData.ClassService)(
         devExt->UpperConnectData.ClassDeviceObject,
         InputDataStart,
