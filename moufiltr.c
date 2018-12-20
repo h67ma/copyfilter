@@ -389,6 +389,8 @@ VOID CopyCallback(_In_ WDFWORKITEM _WorkItem)
 
 VOID CopyFile()
 {
+	NTSTATUS status;
+
 	UNICODE_STRING srcFileName;
 	RtlInitUnicodeString(&srcFileName, L"\\DosDevices\\C:\\Users\\sancho\\Desktop\\src.txt");
 
@@ -403,23 +405,42 @@ VOID CopyFile()
 
 	HANDLE srcFileHandle;
 	IO_STATUS_BLOCK srcIoStatusBlock;
-	NTSTATUS srcStatus = ZwCreateFile(&srcFileHandle, GENERIC_READ, &srcObjectAttributes, &srcIoStatusBlock, NULL,
-		FILE_ATTRIBUTE_NORMAL, 0, FILE_OVERWRITE_IF, FILE_SYNCHRONOUS_IO_NONALERT, NULL, 0);
+	status = ZwCreateFile(&srcFileHandle, GENERIC_READ, &srcObjectAttributes, &srcIoStatusBlock, NULL,
+		FILE_ATTRIBUTE_NORMAL, 0, FILE_OPEN, FILE_SYNCHRONOUS_IO_NONALERT, NULL, 0);
+
+	if (!NT_SUCCESS(status))
+	{
+		DebugPrint(("moutiltr: CopyFile: can't create src file: %x\n", status));
+		return;
+	}
 
 	HANDLE dstFileHandle;
 	IO_STATUS_BLOCK dstIoStatusBlock;
-	NTSTATUS dstStatus = ZwCreateFile(&dstFileHandle, GENERIC_WRITE, &dstObjectAttributes, &dstIoStatusBlock, NULL,
+	status = ZwCreateFile(&dstFileHandle, GENERIC_WRITE, &dstObjectAttributes, &dstIoStatusBlock, NULL,
 		FILE_ATTRIBUTE_NORMAL, 0, FILE_OVERWRITE_IF, FILE_SYNCHRONOUS_IO_NONALERT, NULL, 0);
 
-	if (!NT_SUCCESS(srcStatus) || !NT_SUCCESS(dstStatus))
+	if (!NT_SUCCESS(status))
 	{
-		DebugPrint(("moutiltr: CopyCallback: can't open file: srcStatus=%x dstStatus=%x\n", srcStatus, dstStatus));
+		DebugPrint(("moutiltr: CopyFile: can't create dst file: %x\n", status));
 		return;
 	}
 
 	// files ok
+	CHAR buffer[BUFFER_SIZE];
+	while (TRUE)
+	{
+		// read
+		status = ZwReadFile(srcFileHandle, NULL, NULL, NULL, &srcIoStatusBlock, buffer, BUFFER_SIZE, NULL, NULL);
+		if (status == STATUS_END_OF_FILE)
+			break; // eof
+		else if (!NT_SUCCESS(status))
+			DebugPrint(("moutiltr: CopyFile: can't ZwReadFile: %x\n", status));
 
-
+		// write
+		ULONG size = (ULONG)srcIoStatusBlock.Information;
+		status = ZwWriteFile(dstFileHandle, NULL, NULL, NULL, &dstIoStatusBlock, buffer, size, NULL, NULL);
+		if (!NT_SUCCESS(status)) DebugPrint(("moutiltr: CopyFile: can't ZwWriteFile: %x\n", status));
+	}
 
 	ZwClose(srcFileHandle);
 	ZwClose(dstFileHandle);

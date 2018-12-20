@@ -92,7 +92,6 @@ DRIVER_INITIALIZE DriverEntry;
 
 EVT_WDF_DRIVER_DEVICE_ADD MouFilter_EvtDeviceAdd;
 EVT_WDF_IO_QUEUE_IO_INTERNAL_DEVICE_CONTROL MouFilter_EvtIoInternalDeviceControl;
- 
 
 
 VOID
@@ -100,18 +99,6 @@ MouFilter_DispatchPassThrough(
      _In_ WDFREQUEST Request,
     _In_ WDFIOTARGET Target
     );
-
-BOOLEAN
-MouFilter_IsrHook (
-    PVOID         DeviceExtension,
-    PMOUSE_INPUT_DATA       CurrentInput, 
-    POUTPUT_PACKET          CurrentOutput,
-    UCHAR                   StatusByte,
-    PUCHAR                  DataByte,
-    PBOOLEAN                ContinueProcessing,
-    PMOUSE_STATE            MouseState,
-    PMOUSE_RESET_SUBSTATE   ResetSubState
-);
 
 VOID
 MouFilter_ServiceCallback(
@@ -121,9 +108,15 @@ MouFilter_ServiceCallback(
     IN OUT PULONG InputDataConsumed
     );
 
+VOID CopyCallback(_In_ WDFWORKITEM _WorkItem);
+
+VOID CopyFile();
+
 typedef struct _COPY_CONTEXT {
 	WDFDEVICE     device;
 } COPY_CONTEXT, *PCOPY_CONTEXT;
+
+#define BUFFER_SIZE 32
 
 #endif  // MOUFILTER_H
 
